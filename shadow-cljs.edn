@@ -1,0 +1,24 @@
+;; shadow-cljs configuration
+{:deps     {:aliases [:cljs]}
+ :builds
+ {:electron {:target           :node-script
+             :output-to        "resources/electron.js"
+             :main             electron.core/main
+             :compiler-options {:optimizations :simple}}
+  :app      {:target     :browser
+             :output-dir "resources/public/js"
+             :asset-path "js"
+             :modules    {:shared {:entries []}
+                          :app    {:init-fn    edo.core/init
+                                   :depends-on #{:shared}
+                                   }
+                          :worker {:init-fn    edo.worker/init
+                                   :depends-on #{:shared}
+                                   :web-worker true}
+                          }
+             :dev        {:compiler-options {:closure-defines {re-frame.trace.trace-enabled? true
+                                                               malli.registry/type           "custom"}
+                                             :infer-extens    :auto}}
+             :devtools   {:after-load     edo.core/mount-components
+                          :watch-dir      "resources/public"
+                          :preloads       [re-frisk-remote.preload]}}}}
