@@ -4,6 +4,7 @@
    [reagent.ratom :as ra]
    [re-frame.core :as rf]
    [ribelo.doxa :as dx]
+   [ribelo.danzig :as dz :refer [=>>]]
    [edo.ipc :as ipc]))
 
 (rf/reg-sub-raw
@@ -39,7 +40,7 @@
  ::queries
  (fn [_ _]
    (dx/with-dx! [settings_ :edo/settings]
-     (ra/reaction (vals (@settings_ :query/id))))))
+     (ra/reaction (sort-by :query (vals (@settings_ :query/id)))))))
 
 (rf/reg-sub-raw
  ::selected-query
@@ -49,9 +50,18 @@
 
 (rf/reg-sub-raw
  ::query-data
- (fn [_ [_ name]]
-   (dx/with-dx! [app_ :app]
-     (ra/reaction (get-in @app_ [:app/id [:query/name name] :data])))))
+ (fn [_ [_ query]]
+   (dx/with-dx! [settings_ :edo/settings
+                 app_      :app]
+     (ra/reaction
+      (let [favourites (get-in @settings_ [:query/id query :favourites])
+            data (get-in @app_ [:app/id query :data])]
+        (=>> (enc/into-all [] favourites data)
+             (enc/xdistinct :id)))))))
+
+(comment
+  (tap> @(rf/subscribe [::query-data "zet"]))
+  )
 
 (rf/reg-sub-raw
  ::selected-query-data
@@ -61,8 +71,15 @@
                    data           @(rf/subscribe [::query-data selected-query])]
       data))))
 
+(rf/reg-sub-raw
+ ::hovered-tile
+ (fn [_ _]
+   (dx/with-dx! [app_ :app]
+     (ra/reaction
+      (get-in @app_ [:app/id :ui/main :tile-hovered])))))
+
 (comment
   (rf/clear-subscription-cache!)
-  (count @(rf/subscribe [::selected-query-data]))
+  (count @(rf/subscribe [::query-data "armor"]))
   (dx/with-dx! [settings_ :edo/settings]
     settings_))

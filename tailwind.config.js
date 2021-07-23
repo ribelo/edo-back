@@ -9,7 +9,8 @@ module.exports = {
     extend: {
       fontFamily: {
         'mono': ['"Source Code Pro"', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
-        'sans': ['Lato', 'system-ui', '"Segoe UI"', 'Roboto', '"Helvetica Neue"']
+        'sans': ['Lato', 'system-ui', '"Segoe UI"', 'Roboto', '"Helvetica Neue"'],
+        'jp'  : ['"Noto Sans Jp"']
       },
       colors: {
         'nord-0': '#2E3440',

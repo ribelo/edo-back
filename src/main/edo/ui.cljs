@@ -1,7 +1,7 @@
 (ns edo.ui
   (:require
    ["react-transition-group" :refer [Transition CSSTransition TransitionGroup]]
-   ["react-feather" :refer [ChevronRight DollarSign ShoppingCart X Plus]]
+   ["react-feather" :refer [ChevronRight DollarSign ShoppingCart X Plus Trash Heart Eye ArrowDown]]
    ["react-virtualized/dist/commonjs/AutoSizer" :default auto-sizer]
    ["react-virtualized/dist/commonjs/List" :default virtual-list]
    ["react-virtualized/dist/commonjs/Masonry" :default masonry]
@@ -46,8 +46,7 @@
   (fn [{:keys [show? on-close title bg class] :as params} content]
     [:> CSSTransition {:in              show?
                        :timeout         200
-                       :unmount-on-exit true
-                       :class-names     "modal"}
+                       :unmount-on-exit true}
      (fn [_]
        (r/as-element
         ^{:key :modal}
@@ -79,8 +78,7 @@
 
 (defn query-modal []
   (let [qname     (r/atom nil)
-        qtext     (r/atom nil)
-        disabled? (ra/reaction (or (empty? @qname) (empty? @qtext)))
+        disabled? (ra/reaction (empty? @qname))
         show?_    (rf/subscribe [::sub/show-query-modal?])]
     (fn []
       [modal {:show?    @show?_
@@ -91,38 +89,26 @@
          [:input {:class       "rounded"
                   :type        :text
                   :auto-focus  true
-                  :placeholder "nazwa"
+                  :placeholder "text"
                   :value       @qname
                   :on-key-down (fn [^js e]
                                  (enc/cond
                                    (= "Enter" (.-key e))
-                                   (do (rf/dispatch [::evt/add-new-query @qname @qtext])
+                                   (do (rf/dispatch [::evt/add-new-query @qname])
                                        (rf/dispatch [::evt/toggle-query-modal]))
                                    (= "Escape" (.-key e))
                                    (rf/dispatch [::evt/toggle-query-modal])))
-                  :on-change   (fn [^js e] (reset! qname (-> e .-target .-value str/lower)))}]
-         [:input {:class       "rounded"
-                  :type        :text
-                  :placeholder "kwerenda"
-                  :value       @qtext
-                  :on-key-down (fn [^js e]
-                                 (enc/cond
-                                   (= "Enter" (.-key e))
-                                   (do (rf/dispatch [::evt/add-new-query @qname @qtext])
-                                       (rf/dispatch [::evt/toggle-query-modal]))
-                                   (= "Escape" (.-key e))
-                                   (rf/dispatch [::evt/toggle-query-modal])))
-                  :on-change   (fn [^js e] (reset! qtext (-> e .-target .-value)))}]]
+                  :on-change   (fn [^js e] (reset! qname (-> e .-target .-value str/lower)))}]]
         [:button {:class    ["flex self-center mt-2 px-4 py-1 bg-nord-0 font-medium"
-                          (if-not @disabled?
-                            "text-nord-4 hover:text-nord-6 hover:bg-nord-7 ring-nord-7"
-                            "text-nord-4 hover:text-nord-6 hover:bg-nord-11 ring-nord-11")
-                          "outline-none focus:ring"
-                          "rounded shadow cursor-pointer border border-gray-900"
-                          "transition duration-150 w-24"]
+                             (if-not @disabled?
+                               "text-nord-4 hover:text-nord-6 hover:bg-nord-7 ring-nord-7"
+                               "text-nord-4 hover:text-nord-6 hover:bg-nord-11 ring-nord-11")
+                             "outline-none focus:ring"
+                             "rounded shadow cursor-pointer border border-gray-900"
+                             "transition duration-150 w-24"]
                   :disabled @disabled?
                   :on-click (fn []
-                              (rf/dispatch [::evt/add-new-query @qname @qtext])
+                              (rf/dispatch [::evt/add-new-query @qname])
                               (rf/dispatch [::evt/toggle-query-modal]))}
          [:div {:class "w-full text-center"}
           "dodaj"]]]])))
@@ -133,17 +119,26 @@
     [:<>
      [:div {:class "flex flex-col text-nord-5"}
       (doall
-       (for [{:keys [name query]} queries]
-         ^{:key name}
+       (for [{:keys [query]} queries]
+         ^{:key query}
          [:div {:class    ["flex justify-between cursor-pointer hover:bg-nord-2"
-                           (when (= name (:name selected-query)) "bg-nord-3 hover:bg-nord-1")]
-                :on-click #(rf/dispatch [::evt/select-query name query])}
+                           (when (= query selected-query) "bg-nord-3 hover:bg-nord-1")]
+                :on-click #(rf/dispatch [::evt/select-query query])}
           [:div {:class "flex"}
-           name]
-          [:div {:on-click (fn [^js e]
-                             (.stopPropagation e)
-                             (rf/dispatch [::evt/remove-query name]))}
-           [:> X]]]))
+           query]
+          [:div {:class "flex items-center"}
+           [:div {:class    "hover:text-nord-11"
+                  :on-click (fn [^js e]
+                              (.stopPropagation e)
+                              (rf/dispatch [::evt/cleanup-cache query]))}
+            [:> Trash
+             {:size 18}]]
+           [:div {:class    "hover:text-nord-11"
+                  :on-click (fn [^js e]
+                              (.stopPropagation e)
+                              (rf/dispatch [::evt/remove-query query]))}
+            [:> X
+             {:size 18}]]]]))
       [:div {:class    "flex justify-center mt-4 cursor-pointer"
              :on-click #(rf/dispatch [::evt/toggle-query-modal])}
        [:> Plus]]]
@@ -154,56 +149,96 @@
    [:div {:class "flex flex-none flex-col w-64 p-4 bg-nord-1 overflow-y-auto shadow-xl transition-all duration-150 ease-in-out"}
     content]])
 
-(defn table-row [row]
-  [:div {:class ["flex h-full w-full gap-2 transition duration-150 ease-in-out"]}
-   (for [{:keys [id url img]} row]
-     ^{:key id}
-     [:div {:class "flex-1 self-center truncate"}
-      [:div {:class "cursor-pointer"
-             :on-click (fn []
-                         (rf/dispatch [::evt/add-to-favourites id])
-                         (rf/dispatch [::evt/open-browser url]))}
-       [:img {:src img
-              :style {:max-height "180px"
-                      :max-width  "180px"
-                      :height     :auto
-                      :width      :auto}}]]])])
+(defn image-modal [img]
+  (let [pos (r/atom [])]
+    (fn [img]
+      [:div {:class "fixed flex inset-0 w-full h-full z-50 bg-nord-0 bg-opacity-50 justify-center items-center"}
+       [:div {:class "pl-64 z-100"}
+        [:img {:class "flex w-[66vw] h-[66vw] cursor-pointer object-contain"
+               :on-mouse-move
+               (fn [^js e]
+                 (enc/cond
+                   :let [[x' y'] @pos
+                         x       (.-clientX e)
+                         y       (.-clientY e)
+                         w       (.-clientWidth js/document.body)
+                         h       (.-clientHeight js/document.body)]
+                   (or (not x') (not y'))
+                   (reset! pos [(.-clientX e) (.-clientY e)])
 
-(defn table [{:keys [name query]}]
-  (let [data @(rf/subscribe [::sub/query-data name])
-        partitioned (partition 6 data)]
-    [:div {:class "flex flex-col flex-1 px-4 pt-4 pb-1"}
-     [:div {:class ["flex-1 border-b border-nord-3"]}
+                   (or (< 0.05 (/ (js/Math.abs (- (js/Math.abs x) (js/Math.abs x'))) w))
+                       (< 0.05 (/ (js/Math.abs (- (js/Math.abs y) (js/Math.abs y'))) h)))
+                   (rf/dispatch [::evt/hover-tile :leave img])))
+               :src   img}]]])))
+
+(defn table-row [query row]
+  (let [hovered-tile @(rf/subscribe [::sub/hovered-tile])]
+    (into [:div {:class ["flex h-full w-full gap-2 transition duration-150 ease-in-out"]}]
+          (map (fn [{:keys [id img price favourite?]}]
+                 [:div {:class "flex flex-col my-5 flex-1 h-[212px] self-center truncate"}
+                  [:div {:class "flex flex-col h-full"}
+                   [:img {:class "flex-1 cursor-pointer object-scale-down"
+                          :src   img
+                          :style {:max-height "180px"
+                                  :width      :auto}}]
+                   [:div {:class "flex flex-none justify-between px-1"}
+                    [:div {:class "cursor-pointer"
+                           :on-click (fn []
+                                       (rf/dispatch [::evt/open-browser (enc/format "https://zenmarket.jp/en/auction.aspx?itemCode=%s" id)]))}
+                     price]
+                    [:div {:on-mouse-enter (fn [_e]
+                                             (rf/dispatch [::evt/hover-tile :enter img]))
+                           :on-mouse-leave (fn [_e]
+                                             (when-not hovered-tile
+                                               (rf/dispatch [::evt/hover-tile :leave img])))}
+                     [:> Eye]]
+                    [:div {:class    ["cursor-pointer" (when favourite? "text-nord-11")]
+                           :on-click (fn [^js e]
+                                       (.stopPropagation e)
+                                       (rf/dispatch [::evt/toggle-favourite id query img price favourite?]))}
+                     [:> Heart]]]]]))
+          row)))
+
+(defn table [query]
+  (let [data @(rf/subscribe [::sub/query-data query])
+        partitioned (partition-all 6 data)]
+    [:div {:class "flex flex-col flex-1"}
+     [:div {:class ["flex-1 pt-4 pb-1 border-b border-nord-3"]}
       [:> auto-sizer
        (fn [^js sizer]
          (r/as-element
           [:> virtual-list
-           {:class       ["focus:outline-none !overflow-y-scroll"]
+           {:class       ["focus:outline-none px-4 !overflow-y-scroll"]
             :height      (.-height sizer)
             :width       (.-width sizer)
-            :rowHeight   200
+            :rowHeight   220
             :rowCount    (count partitioned)
-            :onScroll    (fn [^js m]
-                           (when (>= (+ (.-scrollTop m) (.-clientHeight m) 96)
-                                     (.-scrollHeight m))
-                             (rf/dispatch [::evt/fetch-query name query])))
             :rowRenderer (fn [^js m]
                            (r/as-element
                             ^{:key (.-key m)}
                             [:div {:style (.-style m)}
-                             [table-row (nth partitioned (.-index m))]]))}]))]]]))
+                             [table-row query (nth partitioned (.-index m))]]))}]))]]]))
 
 (defn main-view []
-  (let [query @(rf/subscribe [::sub/selected-query])]
+  (let [query @(rf/subscribe [::sub/selected-query])
+        cb    (fn [^js x]
+                (when (= "Escape" (.-key x))
+                  (rf/dispatch [::evt/hover-tile :leave nil])))
+        _     (.addEventListener js/document "keydown" cb)]
     [:div {:class "flex flex-col h-screen min-h-screen bg-nord-4 text-nord-1"}
      [:div {:class "flex flex-1 overflow-y-hidden overflow-x-hidden"}
       [sidebar [query-sidebar]]
-      [table query]]]))
+      [:div {:class "flex flex-1 flex-col"}
+       [table query]
+       [:div {:class    "flex justify-center my-4 cursor-pointer"
+              :on-click #(rf/dispatch [::evt/fetch-query query])}
+       [:> ArrowDown]]]]]))
 
 (defn view []
   (let [boot-successful? @(rf/subscribe [::init/boot-successful?])
         app-version      @(rf/subscribe [:edo/version])
-        show-spinner?    @(rf/subscribe [::ui.sub/show-spinner?])]
+        show-spinner?    @(rf/subscribe [::ui.sub/show-spinner?])
+        hovered-tile     @(rf/subscribe [::sub/hovered-tile])]
     [:div
      (enc/cond
        boot-successful?
@@ -221,6 +256,7 @@
                                           :appear-active "transition-opacity duration-1000 opacity-100"}}
           [:span {:class "absolute text-nord-4 text-sm right-0"}
            app-version]]]])
+     (when hovered-tile [image-modal hovered-tile])
      [notification]
      (when show-spinner? [loader])]
 
