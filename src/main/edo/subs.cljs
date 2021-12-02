@@ -30,6 +30,27 @@
       (get-in @dx_ [:app/id :app/info :app/version])))))
 
 (rf/reg-sub-raw
+ ::edit-query
+ (fn [_ _]
+   (dx/with-dx! [dx_ :app]
+     (ra/reaction
+      (get-in @dx_ [:app/id :app/ui :edit-query])))))
+
+(rf/reg-sub-raw
+ ::query-text
+ (fn [_ [_ {:keys [query]}]]
+   (dx/with-dx! [dx_ :edo/settings]
+     (ra/reaction
+      (get-in @dx_ [:query/id query :query])))))
+
+(rf/reg-sub-raw
+ ::query-size
+ (fn [_ [_ {:keys [query]}]]
+   (dx/with-dx! [dx_ :edo/settings]
+     (ra/reaction
+      (get-in @dx_ [:query/id query :size] 1)))))
+
+(rf/reg-sub-raw
  ::show-query-modal?
  (fn [_ _]
    (dx/with-dx! [dx_ :app]

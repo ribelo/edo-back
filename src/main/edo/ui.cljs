@@ -1,7 +1,7 @@
 (ns edo.ui
   (:require
    ["react-transition-group" :refer [Transition CSSTransition TransitionGroup]]
-   ["react-feather" :refer [ChevronRight DollarSign ShoppingCart X Plus Trash Heart Eye ArrowDown]]
+   ["react-feather" :refer [ChevronRight DollarSign ShoppingCart X Plus Trash Heart Eye ArrowDown Edit2]]
    ["react-virtualized/dist/commonjs/AutoSizer" :default auto-sizer]
    ["react-virtualized/dist/commonjs/List" :default virtual-list]
    ["react-virtualized/dist/commonjs/Masonry" :default masonry]
@@ -77,28 +77,48 @@
           :style {:border-top-color "#5E81AC"}}]])
 
 (defn query-modal []
-  (let [qname     (r/atom nil)
-        disabled? (ra/reaction (empty? @qname))
-        show?_    (rf/subscribe [::sub/show-query-modal?])]
+  (let [qname_    (r/atom nil)
+        size_     (r/atom nil)
+        disabled? (ra/reaction (empty? @qname_))
+        show?_    (rf/subscribe [::sub/show-query-modal?])
+        edit_     (rf/subscribe [::sub/edit-query])]
     (fn []
+      (println :qname @qname_ (type @qname_) @edit_)
       [modal {:show?    @show?_
               :title    "zapytanie"
-              :on-close #(rf/dispatch [::evt/toggle-query-modal])}
+              :on-close (fn []
+                          (rf/dispatch [::evt/toggle-query-modal])
+                          (reset! qname_ nil)
+                          (reset! size_  nil))}
        [:div {:class "flex flex-col"}
         [:div {:class "flex gap-2"}
-         [:input {:class       "rounded"
-                  :type        :text
-                  :auto-focus  true
-                  :placeholder "text"
-                  :value       @qname
-                  :on-key-down (fn [^js e]
-                                 (enc/cond
-                                   (= "Enter" (.-key e))
-                                   (do (rf/dispatch [::evt/add-new-query @qname])
-                                       (rf/dispatch [::evt/toggle-query-modal]))
-                                   (= "Escape" (.-key e))
-                                   (rf/dispatch [::evt/toggle-query-modal])))
-                  :on-change   (fn [^js e] (reset! qname (-> e .-target .-value str/lower)))}]]
+         [:div {:class "flex flex-col"}
+          [:div {:class "text-xs text-nord-5"}
+           "kwerenda"]
+          [:input {:class       "rounded"
+                   :type        :text
+                   :auto-focus  true
+                   :value       (or @qname_ @(rf/subscribe [::sub/query-text {:query @edit_}]))
+                   :on-key-down (fn [^js e]
+                                  (enc/cond
+                                    (= "Enter" (.-key e))
+                                    (do (rf/dispatch [::evt/add-new-query {:query @qname_ :size @size_}])
+                                        (rf/dispatch [::evt/toggle-query-modal])
+                                        (reset! qname_ nil)
+                                        (reset! size_  nil))
+                                    (= "Escape" (.-key e))
+                                    (rf/dispatch [::evt/toggle-query-modal])))
+                   :on-change   (fn [^js e] (reset! qname_ (-> e .-target .-value str/lower)))}]]
+         [:div {:class "flex flex-col"}
+          [:div {:class "text-xs text-nord-5"}
+           "ilość jednorazowo pobieranych stron"]
+          [:input {:class       "rounded"
+                   :type        :number
+                   :placeholder "ilość stron"
+                   :value       (or @size_ @(rf/subscribe [::sub/query-size {:query @edit_}]))
+                   :on-change (fn [^js e]
+                                (reset! size_ (-> e .-target .-value))
+                                (rf/dispatch [::evt/add-new-query {:query @qname_ :size @size_}]))}]]]
         [:button {:class    ["flex self-center mt-2 px-4 py-1 bg-nord-0 font-medium"
                              (if-not @disabled?
                                "text-nord-4 hover:text-nord-6 hover:bg-nord-7 ring-nord-7"
@@ -108,14 +128,17 @@
                              "transition duration-150 w-24"]
                   :disabled @disabled?
                   :on-click (fn []
-                              (rf/dispatch [::evt/add-new-query @qname])
-                              (rf/dispatch [::evt/toggle-query-modal]))}
+                              (rf/dispatch [::evt/add-new-query {:query @qname_ :size @size_}])
+                              (rf/dispatch [::evt/toggle-query-modal])
+                              (reset! qname_ nil)
+                              (reset! size_  nil))}
          [:div {:class "w-full text-center"}
           "dodaj"]]]])))
 
 (defn query-sidebar []
   (let [queries        @(rf/subscribe [::sub/queries])
-        selected-query @(rf/subscribe [::sub/selected-query])]
+        selected-query @(rf/subscribe [::sub/selected-query])
+        edit-query     @(rf/subscribe [::sub/edit-query])]
     [:<>
      [:div {:class "flex flex-col text-nord-5"}
       (doall
@@ -127,6 +150,12 @@
           [:div {:class "flex"}
            query]
           [:div {:class "flex items-center"}
+           [:div {:class    "hover:text-nord-11"
+                  :on-click (fn [^js e]
+                              (.stopPropagation e)
+                              (rf/dispatch [::evt/edit-query {:query query}]))}
+            [:> Edit2
+             {:size 18}]]
            [:div {:class    "hover:text-nord-11"
                   :on-click (fn [^js e]
                               (.stopPropagation e)
@@ -142,7 +171,7 @@
       [:div {:class    "flex justify-center mt-4 cursor-pointer"
              :on-click #(rf/dispatch [::evt/toggle-query-modal])}
        [:> Plus]]]
-     [query-modal]]))
+     [query-modal {:query edit-query}]]))
 
 (defn sidebar [content]
   [:div {:class "flex flex-none"}
@@ -230,9 +259,9 @@
       [sidebar [query-sidebar]]
       [:div {:class "flex flex-1 flex-col"}
        [table query]
-       [:div {:class    "flex justify-center my-4 cursor-pointer"
-              :on-click #(rf/dispatch [::evt/fetch-query query])}
-       [:> ArrowDown]]]]]))
+       [:div {:class "flex justify-center my-4 cursor-pointer"}
+        [:> ArrowDown
+         {:on-click #(rf/dispatch [::evt/fetch-query {:query query}])}]]]]]))
 
 (defn view []
   (let [boot-successful? @(rf/subscribe [::init/boot-successful?])

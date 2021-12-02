@@ -2,7 +2,6 @@
   (:require
    [reagent.ratom :as ra :refer [reaction]]
    [re-frame.core :as rf]
-   [day8.re-frame.async-flow-fx]
    [cljs-bean.core :as bean :refer [->js ->clj]]
    [shadow.resource :as rc]
    [taoensso.timbre :as timbre]

@@ -3,16 +3,20 @@
    [re-frame.core :as rf]
    [taoensso.encore :as enc]
    [taoensso.timbre :as timbre]
+   [missionary.core :as mi]
    [ribelo.doxa :as dx]
    [edo.electron.core :refer [app]]
    [edo.transit :refer [write-transit read-transit]]
    [edo.file-storage.util :as u]))
 
-(rf/reg-fx
- :freeze-dx
- (fn [store db]
-   (timbre/debug ::freeze-dx store)
-   (u/freeze-dx store db)))
+(let [tasks_ (atom {})]
+  (rf/reg-fx
+   :freeze-dx
+   (fn [store db]
+     (timbre/debug ::freeze-dx store)
+     (when-let [cancel (@tasks_ store)] (cancel))
+     (let [task (mi/sp (mi/? (mi/sleep 3000)) (u/freeze-dx store db))]
+       (swap! tasks_ assoc store (task #() #()))))))
 
 ;; TODO on-success/failure
 (rf/reg-fx

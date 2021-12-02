@@ -1,9 +1,9 @@
 (ns edo.axios.fx
   (:require
-   [cljs.core.async :as a :refer [<! go go-loop]]
-   [cljs.core.async.interop :refer-macros [<p!]]
    [taoensso.encore :as enc]
    [taoensso.timbre :as timbre]
+   [meander.epsilon :as m]
+   [missionary.core :as mi]
    [re-frame.core :as rf]
    [cljs-bean.core :refer [->js]]))
 
@@ -11,44 +11,54 @@
 
 (defn <http
   [{:keys [method url body settings]}]
-  (go (case method
-        :get  (<p! (.get  axios url (->js settings)))
-        :post (<p! (.post axios url (->js body) (->js settings))))))
+  (fn [s f]
+    (case method
+      :get  (-> (.get  axios url (->js settings)) (.then s f))
+      :post (-> (.post axios url (->js body) (->js settings)) (.then s f)))
+    (fn [])))
 
-(comment
-  (go
-    (let [resp (<p! (.post axios (enc/format "https://zenmarket.jp/en/yahoo.aspx/getProducts?q=%s"
-                                             (enc/url-encode "test"))
-                           (->js {:page 9999
-                                  :limit 100})))]
-      (tap> [:resp resp])))
-  )
+(defn flatten-dispatch [x]
+  (m/rewrite x
+    (m/with [%a [(m/pred keyword?) . !xs ... :as !vs]
+             %b (m/or [(m/or %a %b) ...] %a nil)]
+            %b)
+    [!vs ...]
+    _
+    ~(timbre/error :flatte-dispatch x)))
 
 (rf/reg-fx
  :axios
- (let [limiter (enc/limiter {:3s [5 3000]})]
-   (fn [{:keys [method url body settings on-success on-failure] :as m}]
-     (go-loop []
-       (enc/cond
-         (limiter)
-         (do (<! (a/timeout 1000)) (recur))
+ (let [limiter (enc/limiter {:5s [5 5000]})]
+   (fn [{:keys [url on-success on-failure] :as m}]
+     (let [t (mi/sp
+              (loop []
+                (if-let [ms (second (limiter))]
+                  (do
+                    (mi/? (mi/sleep (inc ms)))
+                    (recur))
+                  (let [resp (mi/? (<http m))
+                        code (some-> resp .-status)]
+                    (if (== 200 code)
+                      resp
+                      (throw (ex-info "request failed" {:code code :url url :resp resp})))))))]
+       (t
+        (fn [resp]
+          (enc/cond!
+            (fn? on-success)
+            (on-success resp)
 
-         :let [v    (<! (<http m))
-               code (.-status v)]
+            (vector? on-success)
+            (doseq [[k m] (flatten-dispatch on-success)]
+              (rf/dispatch [k (assoc m :resp resp)]))))
+        (fn [err]
+          (let [resp (or (.-data err) (.-response err))
+                code (or (:code resp) (.-status resp))
+                url  (or (:url resp)  (-> ^js resp .-config .-url))]
+            (timbre/warnf "request: %s code: %s" url code)
+            (enc/cond!
+              (fn? on-failure)
+              (on-failure resp)
 
-         (== 200 code)
-         (enc/cond
-           (fn? on-success)                 (on-success v)
-           (vector? on-success)             (rf/dispatch (conj on-success v))
-           (enc/revery? vector? on-success) (doseq [v on-success]
-                                              (rf/dispatch (conj on-success v)))
-           v)
-
-         :else
-         (do (timbre/warnf "request: %s code: %s" url code)
-             (enc/cond
-               (fn? on-failure)                 (on-failure v)
-               (vector? on-failure)             (rf/dispatch (conj on-failure v))
-               (enc/revery? vector? on-failure) (doseq [v on-failure]
-                                                  (rf/dispatch (conj on-failure v)))
-               v)))))))
+              (vector? on-failure)
+              (doseq [[k m] (flatten-dispatch on-failure)]
+                (rf/dispatch [k (assoc m :resp resp)]))))))))))

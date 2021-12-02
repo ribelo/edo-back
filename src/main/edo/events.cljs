@@ -12,14 +12,22 @@
 
 (rf/reg-event-fx
  ::toggle-query-modal
- (fn [_ _]
-   {:fx [[:commit [:app [:dx/update [:app/id :app/ui] :show-query-modal? not]]]]}))
+ (fn [_ [_ {:keys [edit?]}]]
+   {:fx [[:commit [:app [[:dx/update [:app/id :app/ui] :show-query-modal? not]
+                         (when-not edit?
+                           [:dx/delete [:app/id :app/ui] :edit-query])]]]]}))
+
+(rf/reg-event-fx
+ ::edit-query
+ (fn [_ [_ {:keys [query]}]]
+   {:fx [[:commit   [:app [:dx/put [:app/id :app/ui] :edit-query query]]]
+         [:dispatch [::toggle-query-modal {:edit? true}]]]}))
 
 (rf/reg-event-fx
  ::add-new-query
- (fn [_ [_eid query]]
+ (fn [_ [_eid {:keys [query size]}]]
    (timbre/debug _eid query)
-   {:fx [[:commit [:edo/settings [:dx/put [:query/id query] {:query query}]]]
+   {:fx [[:commit [:edo/settings [:dx/merge [:query/id query] {:query query :size size}]]]
          [:freeze-store :edo/settings]]}))
 
 (rf/reg-event-fx
@@ -34,7 +42,7 @@
  (fn [_ [_eid query]]
    (timbre/debug _eid query)
    {:fx [[:commit [:app [:dx/put [:app/id :app/ui] :selected-query query]]]
-         [:dispatch [::fetch-query query]]]}))
+         [:dispatch [::fetch-query {:query query}]]]}))
 
 (rf/reg-event-fx
  ::toggle-favourite
@@ -55,14 +63,15 @@
                                   [:dx/delete [:query/id query] :favourites]]
                    :app          [[:dx/delete [:app/id query] :data]
                                   [:dx/put    [:app/id query] :end? false]
-                                  [:dx/put    [:app/id query] :last-page 1]]]]
-         [:dispatch [::fetch-query query]]]}))
+                                  [:dx/put    [:app/id query] :last-page 1]]]]]}))
 
 (rf/reg-event-fx
  ::fetch-query
- (fn [{:keys [db]} [_eid query page prev]]
+ [(rf/inject-cofx ::dx/with-dx! [:settings :edo/settings])]
+ (fn [{:keys [db settings]} [_eid {:keys [query page prev counter]}]]
    (timbre/debug _eid query page)
-   (let [page (or page 1)]
+   (let [page (or page 1)
+         counter  (or counter (get-in settings [:query/id query :size]) 1)]
      (when (and name query)
        (let [end? (get-in db [:app/id query :end?])]
          (when-not end?
@@ -70,12 +79,14 @@
                  [:axios {:method     :post
                           :url        (enc/format "https://zenmarket.jp/en/yahoo.aspx/getProducts?q=%s" (enc/url-encode query))
                           :body       {:page page}
-                          :on-success [::fetch-query-success query page prev]
-                          :on-failure [::fetch-query-failure query page prev]}]]}))))))
-
-(comment
-  (dx/with-dx! [settings_ :app]
-    (tap> @settings_)))
+                          :on-success [::fetch-query-success {:query query
+                                                              :page  page
+                                                              :prev  prev
+                                                              :counter counter}]
+                          :on-failure [::fetch-query-failure {:query query
+                                                              :page  page
+                                                              :prev  prev
+                                                              :counter counter}]}]]}))))))
 
 (defn parse-price [s]
   (second (re-find #"data-jpy='(.*?)'" s)))
@@ -83,7 +94,8 @@
 (rf/reg-event-fx
  ::fetch-query-success
  [(rf/inject-cofx ::dx/with-dx! [:settings :edo/settings])]
- (fn [{:keys [settings db]} [_eid query page prev resp]]
+ (fn [{:keys [settings db]} [_eid {:keys [query page prev cnt resp counter]
+                                  :or    {counter 0}}]]
    (timbre/debug _eid query page)
    (let [favourites   (into #{} (map :id) (get-in settings [:query/id query :favourites]))
          cached       (get-in settings [:query/id query :cache] #{})
@@ -110,18 +122,15 @@
                        :app          [[:dx/update [:app/id query] :data (fnil into []) new-data]
                                       [:dx/put [:app/id :ui/main] :show-spinner? false]]]]
 
-             (and (some? data) (not= prev data))
-             [:dispatch [::fetch-query query (inc page) data]]
-
              (or (nil? data) (= prev data))
              [:commit [:app [[:dx/put [:app/id :ui/main] :show-spinner? false]
                              [:dx/put [:app/id query] :end? true]]]])
-           (when (< page 5)
-             [:dispatch [::fetch-query query (inc page) data]])]})))
+           (when (or (pos? counter) (or (nil? data) (= prev data)))
+             [:dispatch [::fetch-query {:query query :page (inc page) :prev data :counter (dec counter)}]])]})))
 
 (rf/reg-event-fx
  ::fetch-query-failure
- (fn [_ [_eid query page]]
+ (fn [_ [_eid {:keys [query page]}]]
    (timbre/error _eid query page)
    {:fx [[:commit [:app [:dx/put [:app/id :ui/main] :show-spinner? false]]]]}))
 
@@ -141,14 +150,3 @@
      :leave
      {:fx [[:commit-later [nil  [_eid img]]]
            [:commit [:app [:dx/delete [:app/id :ui/main] :tile-hovered]]]]})))
-
-(comment
-  (rf/dispatch [::hover-tile :leave])
-  (dx/commit {} [:dx/update [:app/id :a] :data (fnil into []) [1 2 3]])
-
-  (dx/with-dx! [settings_ :edo/settings
-                app_ :app]
-    (tap> @settings_)
-    (tap> @app_))
-
-  )

@@ -16,6 +16,7 @@
            (let [store (.next it)
                  txs   (.next it)]
              (dx/with-dx! [db store]
+               (tap> [:db db :data data])
                (enc/cond
                  :let          [tx (nth txs 0)]
                  (vector?  tx) (dx/commit! db txs)
