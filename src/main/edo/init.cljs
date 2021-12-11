@@ -1,46 +1,49 @@
 (ns edo.init
   (:require
-   [reagent.ratom :as ra :refer [reaction]]
-   [re-frame.core :as rf]
    [cljs-bean.core :as bean :refer [->js ->clj]]
-   [shadow.resource :as rc]
    [taoensso.timbre :as timbre]
-   [ribelo.doxa :as dx]
-   [edo.fx]
-   [edo.cofx]
-   [edo.subs]
+   [missionary.core :as mi]
+   [ribelo.metaxy :as mx]
+   [edo.store :as st]
    [edo.events]
-   [edo.axios.fx]
-   [edo.file-storage.fx]
-   [edo.file-storage.events :as fs.evt]
-   [edo.db.core]
-   [edo.db.fx]
-   [edo.db.events :as db.evt]
+   [edo.subs]
+   [edo.file-storage.events :as fs]
+   [edo.ui.events]
+   [edo.ui.subs]
+   [edo.sidebar.events]
+   [edo.sidebar.subs]
+   ;; [edo.cofx]
+   ;; [edo.subs]
+   ;; [edo.events]
+   ;; [edo.axios.fx]
+   ;; [edo.file-storage.fx]
+   ;; [edo.file-storage.events :as fs.evt]
+   ;; [edo.db.core]
+   ;; [edo.db.fx]
+   ;; [edo.db.events :as db.evt]
 
    ))
 
-(rf/reg-event-fx
- ::set-boot-successful
- (fn [_ _]
-   (timbre/info ::set-boot-successful)
-   {:fx [[:commit [:app [:dx/put [:app/id :settings] :boot-successful? true]]]]}))
+(mx/defevent set-boot-successful []
+  mx/WatchEvent
+  (mx/watch [_ _ _]
+    (timbre/info ::set-boot-successful)
+    (mi/ap
+      (st/commit :edo/app [:dx/put [:app/id :settings] :boot-successful? true]))))
 
-(rf/reg-sub-raw
- ::boot-successful?
- (fn [_ _]
-   (dx/with-dx! [dx_ :app]
-     (reaction
-      (get-in @dx_ [:app/id :settings :boot-successful?])))))
+(mx/add-node! st/dag ::boot-successful?
+  [:edo/app]
+  (fn [_ {:edo/keys [app]}]
+    (get-in app [:app/id :settings :boot-successful?])))
 
-(rf/reg-event-fx
- ::boot
- (fn [{:keys [db]} _]
-   {:fx [[:dispatch [::db.evt/init-db]]
-         [:thaw-store {:store :edo/settings}]
-         [:dispatch [::set-boot-successful]]
-         ]}))
+(mx/defevent boot! []
+  mx/WatchEvent
+  (mx/watch [_ _ _]
+    (mi/ap
+      (mi/amb>
+        (fs/thaw-node :edo/settings)
+        (set-boot-successful)))))
 
-(comment
-  (rf/dispatch [::boot])
-  (meta @re-frame.db/app-db))
-
+;; (comment
+;;   (rf/dispatch [::boot])
+;;   (meta @re-frame.db/app-db))

@@ -3,20 +3,19 @@
          com.taoensso/encore        {:mvn/version "3.19.0"}
          com.taoensso/timbre        {:mvn/version "5.1.2"}
          funcool/cuerdas            {:mvn/version "2021.05.29-0"}
-         missionary/missionary      {:mvn/version "b.23"}
-         re-frame/re-frame          {:mvn/version "1.2.0"}
-         reagent/reagent            {:mvn/version "1.1.0" :exclusions [cljsjs/react cljsjs/react-dom]}
+         missionary/missionary      {:mvn/version "b.24"}
          net.cgrand/xforms          {:mvn/version "0.19.2"}
          cljs-bean/cljs-bean        {:mvn/version "1.7.0"}
          meander/epsilon            {:mvn/version "0.0.650"}
          ribelo/doxa                {:git/url    "https://github.com/ribelo/doxa.git"
-                                     :sha        "ba6d5380186cfc008a2fe82b90f8d21d8392c280"
+                                     :sha        "ff52491b84c6237fc60234278f43a11ac1cd0860"
                                      :exclusions [thheller/shadow-cljs]}
-         ribelo/danzig              {:local/root "../ribelo/danzig"}}
+         ribelo/danzig              {:local/root "../ribelo/danzig"}
+         ribelo/metaxy              {:local/root "../ribelo/metaxy"}
+         funcool/rumext             {:mvn/version "2021.05.12-1"}}
  :aliases
  {:cljs
   {:extra-paths ["src/dev"]
-   :extra-deps  {thheller/shadow-cljs {:mvn/version "2.14.6"}
-                 re-frisk-remote      {:mvn/version "1.5.2"}}
+   :extra-deps  {thheller/shadow-cljs {:mvn/version "2.16.6"}}
    ;; :main-opts   ["-m" "shadow.cljs.devtools.cli"]
    }}}

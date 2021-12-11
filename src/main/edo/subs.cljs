@@ -1,106 +1,69 @@
 (ns edo.subs
   (:require
    [taoensso.encore :as enc]
-   [reagent.ratom :as ra]
-   [re-frame.core :as rf]
+   [taoensso.timbre :as timbre]
    [ribelo.doxa :as dx]
    [ribelo.danzig :as dz :refer [=>>]]
-   [edo.ipc :as ipc]))
+   [missionary.core :as mi]
+   [ribelo.metaxy :as mx]
+   [edo.store :as st]))
 
-(rf/reg-sub-raw
- :pull
- (fn [_ [_ store q eid]]
-   (ra/reaction
-    (dx/with-dx! [db_ store]
-      (dx/pull @db_ q eid)))))
+(mx/add-node! st/dag ::edit-query
+  [:edo/app]
+  (fn [_ {:edo/keys [app]}]
+    (some-> app :app/id :app/ui :edit-query)))
 
-(rf/reg-sub-raw
- :pull-one
- (fn [_ [_ store q eid]]
-   (ra/reaction
-    (dx/with-dx! [db_ store]
-      (dx/pull-one @db_ q eid)))))
+(mx/add-node! st/dag ::query-text
+  [:edo/settings]
+  (fn [_ {:edo/keys [settings]}]
+    (fn [{:keys [query]}]
+      (get-in settings [:query/id query :query] 1))))
 
-(rf/reg-sub-raw
- :edo/version
- (fn [_ _]
-   (ipc/send! [:app/version])
-   (dx/with-dx! [dx_ :app]
-     (ra/reaction
-      (get-in @dx_ [:app/id :app/info :app/version])))))
+(mx/add-node! st/dag ::query-size
+  [:edo/settings]
+  (fn [_ {:edo/keys [settings]}]
+    (fn [{:keys [query]}]
+      (get-in settings [:query/id query :size] 1))))
 
-(rf/reg-sub-raw
- ::edit-query
- (fn [_ _]
-   (dx/with-dx! [dx_ :app]
-     (ra/reaction
-      (get-in @dx_ [:app/id :app/ui :edit-query])))))
+(mx/add-node! st/dag ::show-query-modal?
+  [:edo/app]
+  (fn [_ {:edo/keys [app]}]
+    (some-> app :app/id :app/ui :show-query-modal?)))
 
-(rf/reg-sub-raw
- ::query-text
- (fn [_ [_ {:keys [query]}]]
-   (dx/with-dx! [dx_ :edo/settings]
-     (ra/reaction
-      (get-in @dx_ [:query/id query :query])))))
+(mx/add-node! st/dag ::queries
+  [:edo/settings]
+  (fn [_ {:edo/keys [settings]}]
+    (sort-by :query (vals (settings :query/id)))))
 
-(rf/reg-sub-raw
- ::query-size
- (fn [_ [_ {:keys [query]}]]
-   (dx/with-dx! [dx_ :edo/settings]
-     (ra/reaction
-      (get-in @dx_ [:query/id query :size] 1)))))
+(mx/add-node! st/dag ::selected-query
+  [:edo/app]
+  (fn [_ {:edo/keys [app]}]
+    (some-> app :app/id :app/ui :selected-query)))
 
-(rf/reg-sub-raw
- ::show-query-modal?
- (fn [_ _]
-   (dx/with-dx! [dx_ :app]
-     (ra/reaction
-      (get-in @dx_ [:app/id :app/ui :show-query-modal?])))))
-
-(rf/reg-sub-raw
- ::queries
- (fn [_ _]
-   (dx/with-dx! [settings_ :edo/settings]
-     (ra/reaction (sort-by :query (vals (@settings_ :query/id)))))))
-
-(rf/reg-sub-raw
- ::selected-query
- (fn [_ _]
-   (dx/with-dx! [app_ :app]
-     (ra/reaction (get-in @app_ [:app/id :app/ui :selected-query])))))
-
-(rf/reg-sub-raw
- ::query-data
- (fn [_ [_ query]]
-   (dx/with-dx! [settings_ :edo/settings
-                 app_      :app]
-     (ra/reaction
-      (let [favourites (get-in @settings_ [:query/id query :favourites])
-            data (get-in @app_ [:app/id query :data])]
+(mx/add-node! st/dag ::query-data
+  [:edo/settings :edo/app]
+  (fn [_ {:edo/keys [settings app]}]
+    (fn [{:keys [query]}]
+      (let [favourites (get-in settings [:query/id query :favourites])
+            data (get-in app [:app/id query :data])]
         (=>> (enc/into-all [] favourites data)
-             (enc/xdistinct :id)))))))
+             (enc/xdistinct :id))))))
 
-(comment
-  (tap> @(rf/subscribe [::query-data "zet"]))
-  )
+;; (mx/listen! st/dag
+;;   ::query-data
+;;   {:query "armor"}
+;;   (fn [_id r]
+;;     (println :listen _id :start)
+;;     (println :listen _id :r r)))
 
-(rf/reg-sub-raw
- ::selected-query-data
- (fn [_ _]
-   (ra/reaction
-    (enc/when-let [selected-query @(rf/subscribe [::selected-query])
-                   data           @(rf/subscribe [::query-data selected-query])]
-      data))))
+(mx/add-node! st/dag ::selected-query-data
+  [::selected-query ::query-data]
+  (fn [_ {::keys [selected-query query-data]}]
+    (println :recalculate ::selected-query-data)
+    (query-data {:query selected-query})))
 
-(rf/reg-sub-raw
- ::hovered-tile
- (fn [_ _]
-   (dx/with-dx! [app_ :app]
-     (ra/reaction
-      (get-in @app_ [:app/id :ui/main :tile-hovered])))))
-
-(comment
-  (rf/clear-subscription-cache!)
-  (count @(rf/subscribe [::query-data "armor"]))
-  (dx/with-dx! [settings_ :edo/settings]
-    settings_))
+(mx/add-node! st/dag ::hovered-tile
+  [:edo/app]
+  (fn [id {:edo/keys [app]}]
+    (timbre/debug id)
+    (some-> app :app/id :ui/main :tile-hovered)))

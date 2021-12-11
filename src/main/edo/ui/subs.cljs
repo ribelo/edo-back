@@ -1,32 +1,19 @@
 (ns edo.ui.subs
   (:require
-   [reagent.ratom :as ra :refer [reaction]]
-   [re-frame.core :as rf]
-   [ribelo.doxa :as dx]))
+   [ribelo.metaxy :as mx]
+   [edo.store :as st]))
 
-(rf/reg-sub-raw
- ::notifications
- (fn [_ _]
-   (dx/with-dx! [dx_ :app]
-     (reaction
-      (get-in @dx_ [:app/id :ui/main :notifications])))))
+(mx/add-node! st/dag ::notifications
+  [:edo/app]
+  (fn [_ {:edo/keys [app]}]
+    (get-in app [:app/id :ui/main :notifications])))
 
+(mx/add-node! st/dag ::view
+  [:edo/app]
+  (fn [_ {:edo/keys [app]}]
+    (get-in app [:app/id :ui/main :view] :yahoo)))
 
-
-(comment
-  (dx/with-dx! [dx_ :app]
-    @dx_))
-
-(rf/reg-sub-raw
- ::view
- (fn [_ _]
-   (dx/with-dx! [dx_ :app]
-     (reaction
-      (get-in @dx_ [:app/id :ui/main :view] :yahoo)))))
-
-(rf/reg-sub-raw
- ::show-spinner?
- (fn [_ _]
-   (dx/with-dx! [dx_ :app]
-     (reaction
-      (get-in @dx_ [:app/id :ui/main :show-spinner?])))))
+(mx/add-node! st/dag ::show-spinner?
+  [:edo/app]
+  (fn [_ {:edo/keys [app]}]
+    (get-in app [:app/id :ui/main :show-spinner?])))

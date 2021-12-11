@@ -1,8 +1,11 @@
 (ns edo.sidebar.events
   (:require
-   [re-frame.core :as rf]))
+   [ribelo.metaxy :as mx]
+   [missionary.core :as mi]))
 
-(rf/reg-event-fx
- ::toggle-sidebar
- (fn [_ _]
-   {:fx [[:commit [:app [:dx/update [:app/ui :ui/main] :sidebar-expanded? not]]]]}))
+(defn toggle-sidebar []
+  (mx/reify ::toggle-sidebar
+    mx/WatchEvent
+    (mx/watch [_ _ _]
+      (mi/ap
+        [:commit :edo/app [:dx/update [:app/ui :ui/main] :sidebar-expanded? not]]))))

@@ -1,12 +1,9 @@
 (ns edo.sidebar.subs
   (:require
-   [re-frame.core :as rf]
-   [reagent.ratom :refer [reaction]]
-   [ribelo.doxa :as dx]))
+   [ribelo.metaxy :as mx]
+   [edo.store :as st]))
 
-(rf/reg-sub-raw
- ::sidebar-expanded?
- (fn [_ _]
-   (dx/with-dx! [dx_ :app]
-     (reaction
-      (get-in @dx_ [:app/ui :ui/main :sidebar-expanded?])))))
+(mx/add-node! st/dag ::sidebar-expanded?
+  [:edo/app]
+  (fn [_ {:keys [app]}]
+    (some-> app :app/ui :ui/main :sidebar-expanded?)))

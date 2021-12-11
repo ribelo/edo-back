@@ -8,7 +8,7 @@
   (bt/writer-handlers))
 
 (defn write-transit [s]
-  (t/write (t/writer :json {:handlers write-handlers :transform t/write-meta}) s))
+  (t/write (t/writer :json {:handlers write-handlers}) s))
 
 (defn read-transit [s]
   (t/read (t/reader :json) s))

@@ -1,33 +1,42 @@
 (ns edo.ui.events
   (:require
-   [reagent.core :as r]
-   [re-frame.core :as rf]
    [taoensso.encore :as enc]
-   [meander.epsilon :as m]
-   [ribelo.doxa :as dx]))
+   [ribelo.metaxy :as mx]
+   [missionary.core :as mi]
+   [edo.store :as st]))
 
-(rf/reg-event-fx
- ::add-notification
- (fn [_ [_ id notification]]
-   (enc/have! notification)
-   (let [pred-fn #(not (enc/rsome (partial = notification) %))]
-     {:fx [[:commit       [:app [[:dx/match  [:app/id :ui/main] :notifications pred-fn]
-                                 [:dx/conj   [:app/id :ui/main] :notifications notification]]]]
-           [:commit-later [(enc/ms :secs 3)  [id notification]
-                           :app [:dx/delete  [:app/id :ui/main] :notifications notification]]]]})))
+(defn add-notification [id notification]
+  (mx/reify :add-notification
+    mx/WatchEvent
+    (mx/watch [_ _ _]
+      (let [pred-fn #(not (enc/rsome (partial = notification) %))]
+        (mi/ap
+          (mi/amb>
+            (st/commit :edo/app
+              [[:dx/match [:app/id :ui/main] :notifications pred-fn]
+               [:dx/conj [:app/id :ui/main] :notifications notification]])
+            (st/commit-later (enc/ms :secs 3) [id notification] :edo/app
+              [[:dx/match [:app/id :ui/main] :notifications pred-fn]
+               [:dx/conj [:app/id :ui/main] :notifications notification]])))))))
 
-(rf/reg-event-fx
- ::data-loading
- (fn [_ [_ v]]
-   {:fx [[:commit [:app [:dx/put [:app/id :ui/main] :show-spinner? v]]]]}))
+(defn set-data-loading
+  ([v]
+   (mx/reify ::set-data-loading
+     mx/WatchEvent
+     (mx/watch [id _ _]
+       (cond
+         (boolean? v)
+         (mi/ap
+           (st/commit :edo/app
+             [:dx/put [:app/id :ui/main] :show-spinner? v]))
 
-(rf/reg-event-fx
- ::data-loading-ms
- (fn [_ [_eid id ms]]
-   {:fx [[:commit       [      :app [:dx/put    [:app/id :ui/main] :show-spinner? true]]]
-         [:commit-later [ms id :app [:dx/delete [:app/id :ui/main] :show-spinner?]]]]}))
+         (number? v)
+         (mi/ap
+           (mi/amb>
+             (st/commit :edo/app
+               [:dx/put [:app/id :ui/main] :show-spinner? true])
+             (st/commit-later v id :edo/app
+               [:dx/put [:app/id :ui/main] :show-spinner? false])))
 
-(comment
-  (dx/with-dx! [app_ :app]
-    (tap> @app_))
-  )
+         :else
+         mi/none)))))

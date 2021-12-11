@@ -71,7 +71,6 @@
 (defn check-for-updates-and-notify! []
   (-> (.checkForUpdatesAndNotify auto-updater)
       (.then  (fn [_e tmp]
-                (println :tmp tmp)
                 (send! [:timbre/info  "successful check for updates and notify"])))
       (.catch (fn [err]
                 (send! [:timbre/error (str "failure check for updates and notify " err)])))))

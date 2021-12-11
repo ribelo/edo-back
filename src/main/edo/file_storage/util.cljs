@@ -44,7 +44,6 @@
                   (timbre/error err)
                   (timbre/infof "successful write %s" file-name)))))
 
-
 (defn -read-file [file-name]
   (if (.existsSync fs file-name)
     (read-transit (.readFileSync fs file-name))
@@ -53,21 +52,13 @@
 (defn -read-store-from-file [store]
   (-read-file (store->file-name store)))
 
-(defn freeze-dx [k db]
+(defn freeze-data [k db]
   (if db
     (let [file-name (store->file-name k)]
       (-write-to-file file-name db))
     (timbre/warnf "can't freeze dx: %s, db is empty" k)))
 
-(defn freeze-store [& ks]
-  (doseq [k ks]
-    (freeze-dx k (some-> (dx/get-dx k) deref))))
-
-(defn thaw-store [& ks]
-  (->> (for [k ks]
-         (if-let [data (-read-store-from-file k)]
-           (dx/with-dx! [db_ k]
-             (swap! db_ (fn [] data)))
-           (timbre/errorf "can't thaw %s" k)))
-       (filter some?)
-       seq))
+(defn thaw-data [k]
+  (if-let [data (-read-store-from-file k)]
+    data
+    (timbre/errorf "can't thaw %s" k)))

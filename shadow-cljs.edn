@@ -15,5 +15,4 @@
                                                                malli.registry/type           "custom"}
                                              :infer-extens    :auto}}
              :devtools   {:after-load     edo.core/mount-components
-                          :watch-dir      "resources/public"
-                          :preloads       [re-frisk-remote.preload]}}}}
+                          :watch-dir      "resources/public"}}}}
