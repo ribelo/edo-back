@@ -38,10 +38,11 @@
   (.loadURL ^js/electron.BrowserWindow @main-window (str "file://" js/__dirname "/public/index.html"))
   #_(.loadURL ^js/electron.BrowserWindow @main-window (str "http://localhost:8020/public/index.html"))
   (.on ^js/electron.BrowserWindow @main-window "closed" #(reset! main-window nil))
-  (.on ^js/electron.BrowserWindow @main-window "ready-to-show"
-       (fn []
-         (listen-updates-available!)
-         (check-for-updates-and-notify!))))
+  ;; (.on ^js/electron.BrowserWindow @main-window "ready-to-show"
+  ;;      (fn []
+  ;;        (listen-updates-available!)
+  ;;        (check-for-updates-and-notify!)))
+  )
 
 (defmulti <-renderer first)
 
@@ -95,14 +96,7 @@
                  (enc/ms :secs n))))
          (js/setTimeout (fn [] (.quitAndInstall auto-updater)) (enc/ms :secs 10)))))
 
-(comment
-  (send! [:re-frame/dispatch [:edo.ui.events/add-notification
-                              ::going-to-install
-                              {:content "sex"}]])
-  )
-
 (defn main []
-  (println :version (.getVersion app))
   (.on app "ready" init-browser!)
   (.on app "window-all-closed"
        #(when-not (= js/process.platform "darwin") (.quit app)))
@@ -111,8 +105,3 @@
          (let [event (read-transit x)
                v     (<-renderer event)]
            (.reply e "reply" (write-transit v))))))
-
-(comment
-  (println 1)
-  (send! [:debug "sex from main"])
-  )

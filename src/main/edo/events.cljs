@@ -20,7 +20,6 @@
 (mx/defevent toggle-query-modal [{:keys [edit?]}]
   mx/WatchEvent
   (mx/watch [_ _ _]
-    (println :toggle-query-modal)
     (mi/ap
       (mi/amb>
         (st/commit :edo/app [:dx/update [:app/id :app/ui] :show-query-modal? not])

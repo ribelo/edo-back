@@ -73,7 +73,6 @@
           :style {:border-top-color "#5E81AC"}}]])
 
 (mf/defc query-modal [{:keys [query]}]
-  (println :render :modal query :q)
   (let [qname_    (mf/use-state (or query ""))
         size_     (st/subscribe! ::sub/query-size {:query query})
         disabled? (empty? @qname_)]
