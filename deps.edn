@@ -7,9 +7,7 @@
          net.cgrand/xforms          {:mvn/version "0.19.2"}
          cljs-bean/cljs-bean        {:mvn/version "1.7.0"}
          meander/epsilon            {:mvn/version "0.0.650"}
-         ribelo/doxa                {:git/url    "https://github.com/ribelo/doxa.git"
-                                     :sha        "ff52491b84c6237fc60234278f43a11ac1cd0860"
-                                     :exclusions [thheller/shadow-cljs]}
+         ribelo/doxa                {:local/root "../ribelo/doxa"}
          ribelo/danzig              {:local/root "../ribelo/danzig"}
          ribelo/metaxy              {:local/root "../ribelo/metaxy"}
          funcool/rumext             {:mvn/version "2021.05.12-1"}}

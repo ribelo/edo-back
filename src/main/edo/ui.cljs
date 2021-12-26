@@ -104,8 +104,9 @@
                            "transition duration-150 w-24"]
                 :disabled disabled?
                 :on-click (fn []
-                            (mx/dispatch ::evt/add-new-query {:query @qname_})
-                            (mx/dispatch ::evt/toggle-query-modal nil))}
+                            (mx/dispatch ::evt/add-new-query {:query @qname_ :a 1})
+                            ;; (mx/dispatch ::evt/toggle-query-modal nil)
+                            )}
        [:div {:class "w-full text-center"}
         "dodaj"]]]]))
 

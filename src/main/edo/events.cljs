@@ -44,12 +44,16 @@
        (mx/event :commit :edo/app [:dx/put [:app/id item-id] :page data])))))
 
 (mx/defwatch ::add-new-query
-  [e _ _ {:keys [query]}]
-  (timbre/debug (mx/id e) query)
+  [e _ _ {:keys [query a]}]
+  (timbre/debug (mx/id e) query :a a)
   (mi/ap
    (mi/amb>
     (mx/event :commit :edo/settings [:dx/merge [:query/id query] {:query query}])
     (mx/event ::fs/freeze-node :edo/settings))))
+
+(comment
+  (mx/watch (mx/event ::add-new-query {:query :armor :a 1}) nil nil)
+  )
 
 (mx/defwatch ::remove-query
   [e _ _ {:keys [query]}]
@@ -113,17 +117,19 @@
                        :url        (enc/format "https://zenmarket.jp/en/yahoo.aspx/getProducts?q=%s" (enc/url-encode query))
                        :body       {:page page}
                        :on-success (fn [resp]
-                                     (fetch-query-success {:query   query
-                                                           :page    page
-                                                           :prev    prev
-                                                           :counter counter
-                                                           :resp    resp}))
+                                     (mx/event ::fetch-query-success
+                                               {:query   query
+                                                :page    page
+                                                :prev    prev
+                                                :counter counter
+                                                :resp    resp}))
                        :on-failure (fn [resp]
-                                     (fetch-query-failure {:query   query
-                                                           :page    page
-                                                           :prev    prev
-                                                           :counter counter
-                                                           :resp    resp}))}))))))))
+                                     (mx/event ::fetch-query-failure
+                                               {:query   query
+                                                :page    page
+                                                :prev    prev
+                                                :counter counter
+                                                :resp    resp}))}))))))))
 
 (mx/defwatch ::fetch-query-success
   [e {:edo/keys [settings app]} _ {:keys [query page prev cnt resp counter] :or {counter 0}}]

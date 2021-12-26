@@ -15,6 +15,7 @@
 
 (defn mount-components []
   (timbre/info :mount-components)
+  (mx/run!)
   (mf/mount (mf/element ui/view) (.getElementById js/document "app"))
   )
 
@@ -25,7 +26,6 @@
 
   ;; (ipc/listen!)
   ;; (rf/dispatch-sync [::init/boot])
-  (mount-graph)
   (mount-components)
   (mx/dispatch ::init/boot!)
 

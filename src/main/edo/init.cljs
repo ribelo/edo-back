@@ -27,11 +27,10 @@
 
 (mx/defnode ::boot-successful?
   [_ {:edo/keys [app]}]
-  (println ::node-boot-successful? app)
   (get-in app [:app/id :settings :boot-successful?]))
 
 (comment
-  (mx/value ::boot-successful?)
+  @(mx/value ::boot-successful?)
   )
 
 (mx/defwatch ::boot! [_ _ _]
