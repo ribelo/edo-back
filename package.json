@@ -1,6 +1,6 @@
 {
   "name": "edo",
-  "version": "0.2.0",
+  "version": "0.2.3",
   "main": "resources/electron.js",
   "scripts": {
     "shadow:watch": "shadow-cljs watch app",
@@ -36,7 +36,7 @@
     "echarts": "^5.1.2",
     "electron-updater": "^4.3.9",
     "highlight.js": "9.18.1",
-    "node-html-parser": "^3.3.5",
+    "node-html-parser": "^5.1.0",
     "process": "^0.11.10",
     "react": "17.0.2",
     "react-dom": "17.0.2",

@@ -3,7 +3,6 @@
    [ribelo.metaxy :as mx]
    [edo.store :as st]))
 
-(mx/add-node! st/dag ::sidebar-expanded?
-  [:edo/app]
-  (fn [_ {:keys [app]}]
-    (some-> app :app/ui :ui/main :sidebar-expanded?)))
+(mx/defnode ::sidebar-expanded?
+  [_ {:edo/keys [app]}]
+  (some-> app :app/ui :ui/main :sidebar-expanded?))

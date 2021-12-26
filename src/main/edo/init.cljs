@@ -12,37 +12,33 @@
    [edo.ui.subs]
    [edo.sidebar.events]
    [edo.sidebar.subs]
-   ;; [edo.cofx]
-   ;; [edo.subs]
-   ;; [edo.events]
-   ;; [edo.axios.fx]
-   ;; [edo.file-storage.fx]
-   ;; [edo.file-storage.events :as fs.evt]
-   ;; [edo.db.core]
-   ;; [edo.db.fx]
-   ;; [edo.db.events :as db.evt]
-
    ))
 
-(mx/defevent set-boot-successful []
-  mx/WatchEvent
-  (mx/watch [_ _ _]
-    (timbre/info ::set-boot-successful)
-    (mi/ap
-      (st/commit :edo/app [:dx/put [:app/id :settings] :boot-successful? true]))))
+(comment
 
-(mx/add-node! st/dag ::boot-successful?
-  [:edo/app]
-  (fn [_ {:edo/keys [app]}]
-    (get-in app [:app/id :settings :boot-successful?])))
+  (mx/dispatch ::sex)
+  ((mi/sp (println :mbx (mx/id (mi/? mx/mbx)))) prn prn))
 
-(mx/defevent boot! []
-  mx/WatchEvent
-  (mx/watch [_ _ _]
-    (mi/ap
-      (mi/amb>
-        (fs/thaw-node :edo/settings)
-        (set-boot-successful)))))
+
+(mx/defwatch ::set-boot-successful [_ _ _]
+  (timbre/info ::set-boot-successful)
+  (mi/ap
+   (mx/event :commit :edo/app [:dx/put [:app/id :settings] :boot-successful? true])))
+
+(mx/defnode ::boot-successful?
+  [_ {:edo/keys [app]}]
+  (println ::node-boot-successful? app)
+  (get-in app [:app/id :settings :boot-successful?]))
+
+(comment
+  (mx/value ::boot-successful?)
+  )
+
+(mx/defwatch ::boot! [_ _ _]
+  (mi/ap
+   (mi/amb>
+    (mx/event :fs/thaw-node :edo/settings)
+    (mx/event ::set-boot-successful))))
 
 ;; (comment
 ;;   (rf/dispatch [::boot])
