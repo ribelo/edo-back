@@ -30,12 +30,16 @@
 
 (mx/defnode ::selected-query
   [_ {:edo/keys [app]}]
+  (tap> [:in-node ::selected-query :r (some-> app :app/id :app/ui :selected-query)])
   (some-> app :app/id :app/ui :selected-query))
 
 (mx/defnode ::query-data
   [_ {:edo/keys [settings app]} {:keys [query]}]
   (let [favourites (get-in settings [:query/id query :favourites])
         data (get-in app [:app/id query :data])]
+    (tap> [:in-node ::query-data :query query])
+    ;; (tap> [:in-node ::query-data :app app])
+    ;; (tap> [:in-node ::query-data :data data])
     (=>> (enc/into-all [] favourites data)
          (enc/xdistinct :id))))
 
@@ -45,10 +49,6 @@
 ;;   (fn [_id r]
 ;;     (println :listen _id :start)
 ;;     (println :listen _id :r r)))
-
-(mx/defnode ::selected-query-data
-  [_ {::keys [selected-query query-data]}]
-  (query-data {:query selected-query}))
 
 (mx/defnode ::hovered-tile
   [id {:edo/keys [app]}]

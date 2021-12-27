@@ -211,8 +211,10 @@
     ))
 
 (mf/defc table [{:keys [query]}]
+  (tap> [:render :table :query query])
   (let [data        @(mx/subscribe ::sub/query-data {:query query})
         partitioned (partition-all 6 data)]
+    (println :rerender :table)
     [:div {:class "flex flex-col flex-1"}
      [:div {:class ["flex-1 pt-4 px-4 pb-1 border-b border-nord-3"]}
       [:> Virtuoso
@@ -225,6 +227,7 @@
         cb    (fn [^js x]
                 (when (= "Escape" (.-key x))
                   (mx/dispatch ::evt/hover-tile {:mode :leave :img nil})))]
+    (println :rerender :main-view)
     (.addEventListener js/document "keydown" cb)
     [:div {:class "flex flex-col h-screen min-h-screen bg-nord-4 text-nord-1"}
      [:div {:class "flex flex-1 overflow-y-hidden overflow-x-hidden"}
@@ -240,6 +243,7 @@
   (let [boot-successful? @(mx/subscribe ::init/boot-successful?)
         show-spinner?    @(mx/subscribe ::ui.sub/show-spinner?)
         hovered-tile     @(mx/subscribe ::sub/hovered-tile)]
+    (println :rerender :view)
     [:div
      (enc/cond
        boot-successful?
