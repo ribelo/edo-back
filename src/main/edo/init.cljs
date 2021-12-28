@@ -5,7 +5,7 @@
    [missionary.core :as mi]
    [ribelo.metaxy :as mx]
    [edo.store :as st]
-   [edo.events]
+   [edo.events :as evt]
    [edo.subs]
    [edo.file-storage.events :as fs]
    [edo.ui.events]
@@ -36,8 +36,10 @@
 (mx/defwatch ::boot! [_ _ _]
   (mi/ap
    (mi/amb>
-    (mx/event :fs/thaw-node :edo/settings)
-    (mx/event ::set-boot-successful))))
+    (mx/event ::fs/thaw-node :edo/settings)
+    (mx/event ::set-boot-successful)
+    (mi/? (mi/sleep 3000))
+    (mx/event ::evt/run-auto-fetch))))
 
 ;; (comment
 ;;   (rf/dispatch [::boot])

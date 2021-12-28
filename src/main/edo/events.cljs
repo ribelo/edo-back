@@ -37,18 +37,26 @@
 (mx/defwatch ::parse-auction-page
   [_ {:edo/keys [app]} _ {:keys [item-id]}]
   (mi/ap
-   (when-not (get-in (mi/? app) [:app/id item-id :page])
+   (when-not (get-in (mi/? @app) [:app/id item-id :page])
      (let [resp (mi/? (axios.events/<http {:url    (str "https://zenmarket.jp/auction.aspx?itemCode=" item-id)
                                            :method :get}))
            data (.parse htmlparser (.-data resp))]
        (mx/event :commit :edo/app [:dx/put [:app/id item-id] :page data])))))
 
 (mx/defwatch ::add-new-query
-  [e _ _ {:keys [query a]}]
-  (timbre/debug (mx/id e) query :a a)
+  [e _ _ {:keys [query]}]
+  (timbre/debug (mx/id e) query)
   (mi/ap
    (mi/amb>
     (mx/event :commit :edo/settings [:dx/merge [:query/id query] {:query query}])
+    (mx/event ::fs/freeze-node :edo/settings))))
+
+(mx/defwatch ::toggle-auto-fetch
+  [e _ _ {:keys [query]}]
+  (timbre/debug (mx/id e) query )
+  (mi/ap
+   (mi/amb>
+    (mx/event :commit :edo/settings [:dx/update [:query/id query] :auto-fetch? not])
     (mx/event ::fs/freeze-node :edo/settings))))
 
 (comment
@@ -64,12 +72,13 @@
     (mx/event ::fs/freeze-node :edo/settings))))
 
 (mx/defwatch ::select-query
-  [e _ _ {:keys [query]}]
+  [e {auto-fetch? :edo.subs/auto-fetch?} _ {:keys [query]}]
   (timbre/debug (mx/id e) query)
   (mi/ap
    (mi/amb>
     (mx/event :commit :edo/app [:dx/put [:app/id :app/ui] :selected-query query])
-    (mx/event ::fetch-query {:query query}))))
+    (when-not (auto-fetch? {:query query})
+      (mx/event ::fetch-query {:query query})))))
 
 (mx/defwatch ::toggle-favourite
   [e _ _ {:keys [id query img price favourite?]}]
@@ -105,10 +114,10 @@
   mx/WatchEvent
   (timbre/debug (mx/id e) query page)
   (mi/ap
-   (let [page    (or (get-in (mi/? app) [:app/id query :last-page]) page 1)
+   (let [page    (or (get-in (mi/? @app) [:app/id query :last-page]) page 1)
          counter (or counter 10)]
      (when (and name query)
-       (let [end? (get-in (mi/? app) [:app/id query :end?])]
+       (let [end? (get-in (mi/? @app) [:app/id query :end?])]
          (when-not end?
            (mi/amb>
             (mx/event ::ui.events/set-data-loading true)
@@ -131,15 +140,19 @@
                                                 :counter counter
                                                 :resp    resp}))}))))))))
 
+(comment
+  ((mi/sp (tap> (mi/? @(mx/dag :edo/settings)))) prn prn)
+  )
+
 (mx/defwatch ::fetch-query-success
   [e {:edo/keys [settings app]} _ {:keys [query page prev cnt resp counter] :or {counter 0}}]
   (timbre/debug (mx/id e) query page)
   (mi/ap
-   (let [favourites   (into #{} (map :id) (get-in (mi/? settings) [:query/id query :favourites]))
-         cached       (get-in (mi/? settings) [:query/id query :cache] #{})
-         old-data-ids (into #{} (map :id) (get-in (mi/? app) [:app/id query :data]))
+   (let [favourites   (into #{} (map :id) (get-in (mi/? @settings) [:query/id query :favourites]))
+         cached       (get-in (mi/? @settings) [:query/id query :cache] #{})
+         old-data-ids (into #{} (map :id) (get-in (mi/? @app) [:app/id query :data]))
          to-remove    (into old-data-ids (set/difference cached favourites))
-         page         (or (get-in (mi/? app) [:app/id query :last-page]) page 1)
+         page         (or (get-in (mi/? @app) [:app/id query :last-page]) page 1)
          data         (not-empty (->clj (js/JSON.parse (.-d (.-data resp)))))
          parsed       (m/rewrite data
                         [{:AuctionID        !ids
@@ -157,7 +170,6 @@
       (cond
         (seq new-data)
         (mi/amb>
-         (mx/event :commit :edo/settings [:dx/update [:query/id query] :cache (fnil into #{}) ids])
          (mx/event :commit :edo/app [[:dx/update [:app/id query] :data (fnil into []) new-data]
                                      [:dx/put [:app/id :ui/main] :show-spinner? false]]))
 
@@ -172,6 +184,28 @@
   [e _ _ {:keys [query page]}]
   (timbre/error (mx/id e) query page)
   (mx/event :commit :edo/app [:dx/put [:app/id :ui/main] :show-spinner? false]))
+
+(mx/defwatch ::run-auto-fetch
+  [e {:edo/keys [settings]} _]
+  (->> (mi/ap (mi/amb> (:query/id (mi/? @settings))
+                       (loop [] (mi/amb> (mi/? (mi/sleep (enc/ms :mins 5) (:query/id (mi/? @settings)))) (recur)))))
+       (mi/eduction
+        (comp
+         (mapcat identity)
+         (map second)
+         (filter (fn [m] (.get m :auto-fetch?)))
+         (map (fn [{:keys [query]}]
+                (println :query query)
+                (mx/event ::fetch-query {:query query})))))))
+
+(comment
+  ( (mi/sp (tap> (mi/? @(:edo/settings mx/dag)))) prn prn)
+
+  ((mi/reduce conj
+              (->> (mi/ap (loop [i 0] (mi/amb> (vec (range i)) (recur (inc i)))))
+                   (mi/eduction (mapcat identity) (take 10))))
+   tap> prn)
+  )
 
 (mx/defeffect ::open-browser
   [_ _ _ {:keys [url]}]

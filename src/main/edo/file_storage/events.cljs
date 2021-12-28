@@ -7,18 +7,36 @@
    [edo.store :as st]
    [edo.transit :as t]))
 
-(mx/defeffect ::freeze-node
-  [e dag _stream k]
-  (timbre/debug (mx/id e) k)
+(defn throttle [ms >f]
   (mi/ap
-   (when-let [node (dag k)]
-     (u/freeze-data k (mi/? @node)))))
+   (let [x (mi/?> (mi/relieve {} >f))]
+     (mi/amb> x (do (mi/? (mi/sleep ms)) (mi/amb>))))))
+
+(defmethod mx/event ::freeze-node
+  [_ k]
+  (mx/reify ::freeze-node
+    mx/CustomEvent
+    (mx/props [_] k)
+    (mx/process [_ dag _]
+      (mi/ap
+       (timbre/debug ::freeze-node k)
+       (when-let [node (dag k)]
+         (u/freeze-data k (mi/? @node)))))))
+
+(mx/add-watch!
+ (mx/reify ::watch-freeze-node
+   mx/EffectEvent
+   (mx/effect [_ dag >stream]
+     (mi/ap
+      (let [[_ >x] (mi/?= (->> >stream
+                               (mi/eduction (filter (fn [e] (and (mx/custom-event? e) (keyword-identical? ::freeze-node (mx/id e))))))
+                               (mi/group-by mx/props)))]
+        (let [e (mi/?> (throttle 5000 >x))]
+          (mi/?> (mx/process e dag >stream))))))))
 
 (mx/defupdate ::replace-node
   [e dag k data]
-  (if (dag k)
-    {k data}
-    (timbre/errorf "can't thaw, can't replace node %s that dosen't exist!" k)))
+  {k data})
 
 (mx/defwatch ::thaw-node
   [e dag stream k]

@@ -16,6 +16,10 @@
   [_ {:edo/keys [settings]} {:keys [query]}]
   (get-in settings [:query/id query :query] 1))
 
+(mx/defnode ::auto-fetch?
+  [_ {:edo/keys [settings]} {:keys [query]}]
+  (get-in settings [:query/id query :auto-fetch?]))
+
 (mx/defnode ::query-size
   [_ {:edo/keys [settings]} {:keys [query]}]
   (get-in settings [:query/id query :size] 1))
@@ -30,16 +34,12 @@
 
 (mx/defnode ::selected-query
   [_ {:edo/keys [app]}]
-  (tap> [:in-node ::selected-query :r (some-> app :app/id :app/ui :selected-query)])
   (some-> app :app/id :app/ui :selected-query))
 
 (mx/defnode ::query-data
   [_ {:edo/keys [settings app]} {:keys [query]}]
   (let [favourites (get-in settings [:query/id query :favourites])
         data (get-in app [:app/id query :data])]
-    (tap> [:in-node ::query-data :query query])
-    ;; (tap> [:in-node ::query-data :app app])
-    ;; (tap> [:in-node ::query-data :data data])
     (=>> (enc/into-all [] favourites data)
          (enc/xdistinct :id))))
 

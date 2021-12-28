@@ -1,7 +1,7 @@
 (ns edo.ui
   (:require
    ["react-transition-group" :refer [Transition CSSTransition TransitionGroup]]
-   ["react-feather" :refer [ChevronRight DollarSign ShoppingCart X Plus Trash Heart Eye ArrowDown Edit2]]
+   ["react-feather" :refer [ChevronRight DollarSign ShoppingCart X Plus Trash Heart Eye ArrowDown Edit2 Radio]]
    ["react-virtuoso" :refer [Virtuoso]]
    [rumext.alpha :as mf]
    [taoensso.encore :as enc]
@@ -15,6 +15,7 @@
    [missionary.core :as mi]
    [ribelo.metaxy :as mx]
    [edo.store :as st]
+   [edo.file-storage.events :as fs]
    ))
 
 
@@ -110,38 +111,47 @@
        [:div {:class "w-full text-center"}
         "dodaj"]]]]))
 
+(mf/defc sidebar-elem [{:keys [query]}]
+  (let [selected-query @(mx/subscribe ::sub/selected-query)
+        auto-fetch? @(mx/subscribe ::sub/auto-fetch? {:query query})]
+    [:div {:class    ["flex justify-between cursor-pointer hover:bg-nord-2"
+                      (when (= query selected-query) "bg-nord-3 hover:bg-nord-1")]
+           :on-click #(mx/dispatch ::evt/select-query {:query query})}
+     [:div {:class "flex"}
+      query]
+     [:div {:class "flex gap-2 items-center"}
+      [:div {:class    "hover:text-nord-10"
+             :on-click (fn [^js e]
+                         (.stopPropagation e)
+                         (mx/dispatch ::evt/edit-query {:query query}))}
+       [:> Edit2 {:size 18}]]
+      [:div {:class     (if-not auto-fetch?
+                          "hover:text-nord-14"
+                          "text-nord-14 hover:text-nord-5")
+             :on-click (fn [^js e]
+                         (.stopPropagation e)
+                         (mx/dispatch ::evt/toggle-auto-fetch {:query query}))}
+       [:> Radio {:size 18}]]
+      [:div {:class    "hover:text-nord-13"
+             :on-click (fn [^js e]
+                         (.stopPropagation e)
+                         (mx/dispatch ::evt/cleanup-cache {:query query}))}
+       [:> Trash {:size 18}]]
+      [:div {:class    "hover:text-nord-11"
+             :on-click (fn [^js e]
+                         (.stopPropagation e)
+                         (mx/dispatch ::evt/remove-query {:query query}))}
+       [:> X {:size 18}]]]]))
+
 (mf/defc query-sidebar []
   (let [queries           @(mx/subscribe ::sub/queries)
-        selected-query    @(mx/subscribe ::sub/selected-query)
         edit-query        @(mx/subscribe ::sub/edit-query)
         show-query-modal? @(mx/subscribe ::sub/show-query-modal?)
         ]
     [:* {}
      [:div {:class "flex flex-col text-nord-5"}
       (for [{:keys [query]} queries]
-        (do
-          [:div {:class    ["flex justify-between cursor-pointer hover:bg-nord-2"
-                            (when (= query selected-query) "bg-nord-3 hover:bg-nord-1")]
-                 :on-click #(mx/dispatch ::evt/select-query {:query query})}
-           [:div {:class "flex"}
-            query]
-           [:div {:class "flex gap-2 items-center"}
-            [:div {:class    "hover:text-nord-10"
-                   :on-click (fn [^js e]
-                               (.stopPropagation e)
-                               (mx/dispatch ::evt/edit-query {:query query}))}
-             [:> Edit2 {:size 18}]]
-            [:div {:class    "hover:text-nord-13"
-                   :on-click (fn [^js e]
-                               (.stopPropagation e)
-                               (mx/dispatch ::evt/cleanup-cache {:query query}))}
-             [:> Trash {:size 18}]]
-            [:div {:class    "hover:text-nord-11"
-                   :on-click (fn [^js e]
-                               (.stopPropagation e)
-                               (mx/dispatch ::evt/remove-query {:query query}))}
-             [:> X {:size 18}]]]
-           ]))
+        [:& sidebar-elem {:query query}])
       [:div {:class    "flex justify-center mt-4 cursor-pointer"
              :on-click #(mx/dispatch ::evt/toggle-query-modal nil)}
        [:> Plus {:size 18}]]]
@@ -178,6 +188,11 @@
              :src   img}]]]))
 
 (mf/defc table-cell [{:keys [query id img price favourite?]}]
+  (mf/use-effect
+   (mf/deps id)
+   (fn []
+     (mx/dispatch :commit :edo/settings [:dx/update [:query/id query] :cache (fnil conj #{}) id])
+     (mx/dispatch ::fs/freeze-node :edo/settings)))
   (let [seller @(mx/subscribe ::sub/auction-seller {:item-id id})]
     [:div {:class "flex flex-col h-[234px] my-5 flex-1 self-center truncate"}
      [:div {:class "flex flex-col h-full"}
@@ -211,10 +226,8 @@
     ))
 
 (mf/defc table [{:keys [query]}]
-  (tap> [:render :table :query query])
   (let [data        @(mx/subscribe ::sub/query-data {:query query})
         partitioned (partition-all 6 data)]
-    (println :rerender :table)
     [:div {:class "flex flex-col flex-1"}
      [:div {:class ["flex-1 pt-4 px-4 pb-1 border-b border-nord-3"]}
       [:> Virtuoso
@@ -227,7 +240,6 @@
         cb    (fn [^js x]
                 (when (= "Escape" (.-key x))
                   (mx/dispatch ::evt/hover-tile {:mode :leave :img nil})))]
-    (println :rerender :main-view)
     (.addEventListener js/document "keydown" cb)
     [:div {:class "flex flex-col h-screen min-h-screen bg-nord-4 text-nord-1"}
      [:div {:class "flex flex-1 overflow-y-hidden overflow-x-hidden"}
@@ -243,7 +255,6 @@
   (let [boot-successful? @(mx/subscribe ::init/boot-successful?)
         show-spinner?    @(mx/subscribe ::ui.sub/show-spinner?)
         hovered-tile     @(mx/subscribe ::sub/hovered-tile)]
-    (println :rerender :view)
     [:div
      (enc/cond
        boot-successful?
